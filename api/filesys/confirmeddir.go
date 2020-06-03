@@ -5,6 +5,8 @@ package filesys
 
 import (
 	"io/ioutil"
+	"os"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -20,6 +22,30 @@ func NewTmpConfirmedDir() (ConfirmedDir, error) {
 	n, err := ioutil.TempDir("", "kustomize-")
 	if err != nil {
 		return "", err
+	}
+
+	// In MacOs `ioutil.TempDir` creates a directory
+	// with root in the `/var` folder, which is in turn
+	// a symlinked path to `/private/var`.
+	// Function `filepath.EvalSymlinks`is used to
+	// resolve the real absolute path.
+	deLinked, err := filepath.EvalSymlinks(n)
+	return ConfirmedDir(deLinked), err
+}
+
+// NewCacheConfirmedDir returns a cache dir, else error.
+// The directory is may already exist and is based on the input string
+// returned as a ConfirmedDir.
+func NewCacheConfirmedDir(repospec string) (ConfirmedDir, error) {
+	c, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+	n := path.Join(c, "kustomize", repospec)
+
+	if _, err := os.Stat(n); os.IsNotExist(err) {
+		//if directory does not already exist (IE not cached) create it
+		os.MkdirAll(n, os.ModePerm)
 	}
 
 	// In MacOs `ioutil.TempDir` creates a directory
